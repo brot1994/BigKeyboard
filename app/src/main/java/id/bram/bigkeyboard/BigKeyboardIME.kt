@@ -17,6 +17,7 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
     private lateinit var keyboardView: KeyboardView
     private lateinit var lettersKeyboard: Keyboard
     private lateinit var symbolsKeyboard: Keyboard
+    private lateinit var altKeyboard: Keyboard
 
     // --- Shift / caps-lock state ---
     private var isShifted = false          // one-shot shift (kembali normal setelah 1 huruf)
@@ -26,7 +27,8 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
     // --- Auto-capitalize state ---
     private var autoCapNext = true         // huruf pertama di awal ketik / setelah titik
 
-    private var isSymbolsMode = false
+    private enum class PageMode { LETTERS, SYMBOLS, ALT }
+    private var currentPage = PageMode.LETTERS
 
     // --- Long-press DEL state ---
     private val handler = Handler(Looper.getMainLooper())
@@ -37,9 +39,10 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
     }
 
     companion object {
-        private const val KEYCODE_SWITCH_SYMBOLS = -6
+        private const val KEYCODE_TO_SYMBOLS = -6   // "?123" / "123"
+        private const val KEYCODE_TO_LETTERS = -7   // "ABC"
+        private const val KEYCODE_TO_ALT = -10      // "ALT"
         private const val KEYCODE_SWITCH_IME = -2
-        private const val KEYCODE_ALT = -10
         private const val DOUBLE_TAP_MS = 350L
         private const val LONG_PRESS_DELETE_MS = 3000L
     }
@@ -49,6 +52,7 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
             keyboardView = layoutInflater.inflate(R.layout.keyboard_view, null) as KeyboardView
             lettersKeyboard = Keyboard(this, R.xml.keyboard_layout)
             symbolsKeyboard = Keyboard(this, R.xml.keyboard_symbols)
+            altKeyboard = Keyboard(this, R.xml.keyboard_alt)
             keyboardView.keyboard = lettersKeyboard
             keyboardView.setOnKeyboardActionListener(this)
             keyboardView
@@ -60,14 +64,14 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
                 text = "Big Keyboard error:\n${e.javaClass.simpleName}: ${e.message}"
                 setPadding(24, 24, 24, 24)
                 setTextColor(0xFFFFFFFF.toInt())
-                setBackgroundColor(0xFF2b2530.toInt())
+                setBackgroundColor(0xFF0d0d0d.toInt())
             }
         }
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        isSymbolsMode = false
+        currentPage = PageMode.LETTERS
         isShifted = false
         isCapsLocked = false
         autoCapNext = true // huruf pertama saat mulai ketik = kapital
@@ -138,18 +142,24 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
                 updateShiftVisual()
             }
 
-            KEYCODE_SWITCH_SYMBOLS -> {
-                isSymbolsMode = !isSymbolsMode
-                keyboardView.keyboard = if (isSymbolsMode) symbolsKeyboard else lettersKeyboard
+            KEYCODE_TO_SYMBOLS -> {
+                currentPage = PageMode.SYMBOLS
+                keyboardView.keyboard = symbolsKeyboard
+            }
+
+            KEYCODE_TO_LETTERS -> {
+                currentPage = PageMode.LETTERS
+                keyboardView.keyboard = lettersKeyboard
+            }
+
+            KEYCODE_TO_ALT -> {
+                currentPage = PageMode.ALT
+                keyboardView.keyboard = altKeyboard
             }
 
             KEYCODE_SWITCH_IME -> {
                 val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
                 imm.showInputMethodPicker()
-            }
-
-            KEYCODE_ALT -> {
-                // Placeholder: belum ada halaman simbol ke-3.
             }
 
             else -> {

@@ -62,7 +62,7 @@
     <!-- Row 7: ALT, ABC, Space, Enter -->
     <Row>
         <Key android:codes="-10" android:keyLabel="ALT" android:keyWidth="20%p" />
-        <Key android:codes="-6" android:keyLabel="ABC" android:keyWidth="20%p" />
+        <Key android:codes="-7" android:keyLabel="ABC" android:keyWidth="20%p" />
         <Key android:codes="32" android:keyWidth="40%p" android:isRepeatable="true" />
         <Key android:codes="-4" android:keyLabel="↵" android:keyWidth="20%p" />
     </Row>

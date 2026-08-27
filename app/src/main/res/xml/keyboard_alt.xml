@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Keyboard xmlns:android="http://schemas.android.com/apk/res/android"
+    android:keyWidth="20%p"
+    android:keyHeight="65dip"
+    android:horizontalGap="0px"
+    android:verticalGap="2px">
+
+    <!-- Row 1: [ ] { } | -->
+    <Row>
+        <Key android:codes="91" android:keyLabel="[" />
+        <Key android:codes="93" android:keyLabel="]" />
+        <Key android:codes="123" android:keyLabel="{" />
+        <Key android:codes="125" android:keyLabel="}" />
+        <Key android:codes="124" android:keyLabel="|" />
+    </Row>
+
+    <!-- Row 2: \ ~ ` ^ < -->
+    <Row>
+        <Key android:codes="92" android:keyLabel="\\" />
+        <Key android:codes="126" android:keyLabel="~" />
+        <Key android:codes="96" android:keyLabel="`" />
+        <Key android:codes="94" android:keyLabel="^" />
+        <Key android:codes="60" android:keyLabel="&lt;" />
+    </Row>
+
+    <!-- Row 3: > € £ ¥ § -->
+    <Row>
+        <Key android:codes="62" android:keyLabel="&gt;" />
+        <Key android:codes="8364" android:keyLabel="€" />
+        <Key android:codes="163" android:keyLabel="£" />
+        <Key android:codes="165" android:keyLabel="¥" />
+        <Key android:codes="167" android:keyLabel="§" />
+    </Row>
+
+    <!-- Row 4: © ® ™ ° ± -->
+    <Row>
+        <Key android:codes="169" android:keyLabel="©" />
+        <Key android:codes="174" android:keyLabel="®" />
+        <Key android:codes="8482" android:keyLabel="™" />
+        <Key android:codes="176" android:keyLabel="°" />
+        <Key android:codes="177" android:keyLabel="±" />
+    </Row>
+
+    <!-- Row 5: × ÷ ½ ¼ ¾ -->
+    <Row>
+        <Key android:codes="215" android:keyLabel="×" />
+        <Key android:codes="247" android:keyLabel="÷" />
+        <Key android:codes="189" android:keyLabel="½" />
+        <Key android:codes="188" android:keyLabel="¼" />
+        <Key android:codes="190" android:keyLabel="¾" />
+    </Row>
+
+    <!-- Row 6: ¿ ¡ « » DEL -->
+    <Row>
+        <Key android:codes="191" android:keyLabel="¿" />
+        <Key android:codes="161" android:keyLabel="¡" />
+        <Key android:codes="171" android:keyLabel="«" />
+        <Key android:codes="187" android:keyLabel="»" />
+        <Key android:codes="-5" android:keyLabel="DEL" />
+    </Row>
+
+    <!-- Row 7: 123, ABC, Space, Enter -->
+    <Row>
+        <Key android:codes="-6" android:keyLabel="123" android:keyWidth="20%p" />
+        <Key android:codes="-7" android:keyLabel="ABC" android:keyWidth="20%p" />
+        <Key android:codes="32" android:keyWidth="40%p" android:isRepeatable="true" />
+        <Key android:codes="-4" android:keyLabel="↵" android:keyWidth="20%p" />
+    </Row>
+
+</Keyboard>

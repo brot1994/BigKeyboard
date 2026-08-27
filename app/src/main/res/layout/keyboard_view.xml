@@ -5,7 +5,7 @@
     android:layout_height="wrap_content"
     android:layout_alignParentBottom="true"
     android:layout_gravity="bottom"
-    android:background="#2b2530"
+    android:background="#0d0d0d"
     android:keyBackground="@drawable/key_background"
     android:keyTextColor="#FFFFFF"
     android:keyTextSize="20sp"
