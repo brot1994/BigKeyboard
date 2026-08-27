@@ -52,7 +52,7 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
             keyboardView.keyboard = lettersKeyboard
             keyboardView.setOnKeyboardActionListener(this)
             keyboardView
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             // Kalau ada error, tampilkan pesannya di layar (bukan diam/blank)
             // supaya gampang di-screenshot dan dilacak penyebabnya.
             Log.e("BigKeyboardIME", "Gagal membuat input view", e)
