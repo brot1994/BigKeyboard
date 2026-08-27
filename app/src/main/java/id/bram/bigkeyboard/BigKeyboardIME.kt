@@ -5,10 +5,12 @@ import android.inputmethodservice.Keyboard
 import android.inputmethodservice.KeyboardView
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import android.widget.TextView
 
 class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListener {
 
@@ -43,12 +45,24 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
     }
 
     override fun onCreateInputView(): View {
-        keyboardView = layoutInflater.inflate(R.layout.keyboard_view, null) as KeyboardView
-        lettersKeyboard = Keyboard(this, R.xml.keyboard_layout)
-        symbolsKeyboard = Keyboard(this, R.xml.keyboard_symbols)
-        keyboardView.keyboard = lettersKeyboard
-        keyboardView.setOnKeyboardActionListener(this)
-        return keyboardView
+        return try {
+            keyboardView = layoutInflater.inflate(R.layout.keyboard_view, null) as KeyboardView
+            lettersKeyboard = Keyboard(this, R.xml.keyboard_layout)
+            symbolsKeyboard = Keyboard(this, R.xml.keyboard_symbols)
+            keyboardView.keyboard = lettersKeyboard
+            keyboardView.setOnKeyboardActionListener(this)
+            keyboardView
+        } catch (e: Exception) {
+            // Kalau ada error, tampilkan pesannya di layar (bukan diam/blank)
+            // supaya gampang di-screenshot dan dilacak penyebabnya.
+            Log.e("BigKeyboardIME", "Gagal membuat input view", e)
+            TextView(this).apply {
+                text = "Big Keyboard error:\n${e.javaClass.simpleName}: ${e.message}"
+                setPadding(24, 24, 24, 24)
+                setTextColor(0xFFFFFFFF.toInt())
+                setBackgroundColor(0xFF2b2530.toInt())
+            }
+        }
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {

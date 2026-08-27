@@ -56,7 +56,7 @@
         <Key android:codes="42" android:keyLabel="*" />
         <Key android:codes="48" android:keyLabel="0" />
         <Key android:codes="35" android:keyLabel="#" />
-        <Key android:codes="-5" android:keyIcon="@drawable/ic_backspace" />
+        <Key android:codes="-5" android:keyLabel="DEL" />
     </Row>
 
     <!-- Row 7: ALT, ABC, Space, Enter -->
