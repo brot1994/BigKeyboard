@@ -59,13 +59,14 @@
         <Key android:codes="-5" android:keyLabel="DEL" />
     </Row>
 
-    <!-- Row 7: Shift, ?123, Space, Switch IME, Enter -->
+    <!-- Row 7: Shift, ?123, Mic, Space, Switch IME, Enter -->
     <Row>
-        <Key android:codes="-1" android:keyLabel="⇧" android:keyWidth="15%p" android:isModifier="true" android:isSticky="true" />
-        <Key android:codes="-6" android:keyLabel="\?123" android:keyWidth="15%p" />
-        <Key android:codes="32" android:keyLabel="&#160;" android:keyWidth="40%p" android:isRepeatable="true" />
-        <Key android:codes="-2" android:keyLabel="⌨" android:keyWidth="15%p" />
-        <Key android:codes="-4" android:keyLabel="↵" android:keyWidth="15%p" />
+        <Key android:codes="-1" android:keyLabel="⇧" android:keyWidth="14%p" android:isModifier="true" android:isSticky="true" />
+        <Key android:codes="-6" android:keyLabel="\?123" android:keyWidth="14%p" />
+        <Key android:codes="-20" android:keyLabel="🎤" android:keyWidth="14%p" />
+        <Key android:codes="32" android:keyLabel="&#160;" android:keyWidth="30%p" android:isRepeatable="true" />
+        <Key android:codes="-2" android:keyLabel="⌨" android:keyWidth="14%p" />
+        <Key android:codes="-4" android:keyLabel="↵" android:keyWidth="14%p" />
     </Row>
 
 </Keyboard>

@@ -1,16 +1,24 @@
 package id.bram.bigkeyboard
 
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.inputmethodservice.InputMethodService
 import android.inputmethodservice.Keyboard
 import android.inputmethodservice.KeyboardView
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.widget.TextView
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 
 class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListener {
 
@@ -38,13 +46,20 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
         isDeleteLongPress = true
     }
 
+    // --- Voice typing (mic) state ---
+    private var speechRecognizer: SpeechRecognizer? = null
+    private var isListening = false
+
     companion object {
         private const val KEYCODE_TO_SYMBOLS = -6   // "?123" / "123"
         private const val KEYCODE_TO_LETTERS = -7   // "ABC"
         private const val KEYCODE_TO_ALT = -10      // "ALT"
         private const val KEYCODE_SWITCH_IME = -2
+        private const val KEYCODE_MIC = -20
         private const val DOUBLE_TAP_MS = 350L
         private const val LONG_PRESS_DELETE_MS = 3000L
+        private const val MIC_LABEL_IDLE = "🎤"      // 🎤
+        private const val MIC_LABEL_LISTENING = "⏹"        // ⏹
     }
 
     override fun onCreateInputView(): View {
@@ -79,6 +94,18 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
         updateShiftVisual()
     }
 
+    override fun onFinishInputView(finishingInput: Boolean) {
+        super.onFinishInputView(finishingInput)
+        // Keyboard ditutup / pindah field -> hentikan sesi dengar kalau masih aktif.
+        stopListeningAndReset()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        speechRecognizer?.destroy()
+        speechRecognizer = null
+    }
+
     // Tampilan tombol shift mengikuti kondisi gabungan: shift sekali, caps-lock, atau auto-cap.
     private fun updateShiftVisual() {
         keyboardView.isShifted = isShifted || isCapsLocked || autoCapNext
@@ -92,6 +119,114 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
         // dari kemungkinan panjang teks; InputConnection akan berhenti di batas teks yang ada.
         ic.deleteSurroundingText(9999, 9999)
         ic.endBatchEdit()
+    }
+
+    // --- Voice typing (mic) ---
+
+    private fun setMicKeyLabel(label: String) {
+        val key = lettersKeyboard.keys.firstOrNull { it.codes.isNotEmpty() && it.codes[0] == KEYCODE_MIC }
+        key?.label = label
+        keyboardView.invalidateAllKeys()
+    }
+
+    private fun toggleMic() {
+        if (isListening) {
+            // Tap kedua: berhenti dengar, proses jadi teks.
+            speechRecognizer?.stopListening()
+            return
+        }
+
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            Toast.makeText(
+                this,
+                "Izinkan akses mikrofon dulu di app Big Keyboard",
+                Toast.LENGTH_LONG
+            ).show()
+            val intent = Intent(this, SetupActivity::class.java).apply {
+                putExtra(SetupActivity.EXTRA_REQUEST_MIC, true)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            return
+        }
+
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(this, "Speech recognition tidak tersedia di HP ini", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        try {
+            val recognizer = SpeechRecognizer.createSpeechRecognizer(this)
+            speechRecognizer = recognizer
+            recognizer.setRecognitionListener(createRecognitionListener())
+
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "id-ID")
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+                putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+            }
+            recognizer.startListening(intent)
+            isListening = true
+            setMicKeyLabel(MIC_LABEL_LISTENING)
+        } catch (e: Exception) {
+            Log.e("BigKeyboardIME", "Gagal memulai speech recognizer", e)
+            Toast.makeText(this, "Gagal memulai mikrofon", Toast.LENGTH_SHORT).show()
+            stopListeningAndReset()
+        }
+    }
+
+    private fun stopListeningAndReset() {
+        isListening = false
+        try {
+            speechRecognizer?.cancel()
+            speechRecognizer?.destroy()
+        } catch (_: Exception) {
+            // Abaikan; recognizer mungkin sudah dalam keadaan tidak valid.
+        }
+        speechRecognizer = null
+        if (::lettersKeyboard.isInitialized) {
+            setMicKeyLabel(MIC_LABEL_IDLE)
+        }
+    }
+
+    private fun createRecognitionListener(): RecognitionListener = object : RecognitionListener {
+        override fun onReadyForSpeech(params: Bundle?) {}
+        override fun onBeginningOfSpeech() {}
+        override fun onRmsChanged(rmsdB: Float) {}
+        override fun onBufferReceived(buffer: ByteArray?) {}
+        override fun onEndOfSpeech() {}
+
+        override fun onError(error: Int) {
+            val message = when (error) {
+                SpeechRecognizer.ERROR_NO_MATCH -> "Tidak terdengar jelas, coba lagi"
+                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Tidak ada suara terdeteksi"
+                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Izin mikrofon belum diberikan"
+                SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Butuh koneksi internet"
+                else -> null
+            }
+            if (message != null) {
+                Toast.makeText(this@BigKeyboardIME, message, Toast.LENGTH_SHORT).show()
+            }
+            stopListeningAndReset()
+        }
+
+        override fun onResults(results: Bundle?) {
+            val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+            val text = matches?.firstOrNull()
+            if (!text.isNullOrBlank()) {
+                val ic = currentInputConnection
+                ic?.commitText("$text ", 1)
+                // Kalimat baru dari suara -> kapital lagi untuk kata selanjutnya.
+                autoCapNext = false
+            }
+            stopListeningAndReset()
+        }
+
+        override fun onPartialResults(partialResults: Bundle?) {}
+        override fun onEvent(eventType: Int, params: Bundle?) {}
     }
 
     override fun onKey(primaryCode: Int, keyCodes: IntArray?) {
@@ -160,6 +295,10 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
             KEYCODE_SWITCH_IME -> {
                 val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
                 imm.showInputMethodPicker()
+            }
+
+            KEYCODE_MIC -> {
+                toggleMic()
             }
 
             else -> {

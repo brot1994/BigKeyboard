@@ -1,7 +1,9 @@
 package id.bram.bigkeyboard
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
@@ -10,13 +12,63 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import java.io.File
 
 class SetupActivity : Activity() {
 
+    companion object {
+        const val EXTRA_REQUEST_MIC = "request_mic"
+        private const val MIC_PERMISSION_REQUEST_CODE = 1001
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        buildUi()
 
+        // Kalau activity ini dibuka otomatis dari keyboard karena mic belum diizinkan,
+        // langsung munculkan dialog izinnya.
+        if (intent?.getBooleanExtra(EXTRA_REQUEST_MIC, false) == true) {
+            requestMicPermission()
+        }
+    }
+
+    private fun hasMicPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun requestMicPermission() {
+        if (hasMicPermission()) {
+            Toast.makeText(this, "Mikrofon sudah diizinkan", Toast.LENGTH_SHORT).show()
+            return
+        }
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.RECORD_AUDIO),
+            MIC_PERMISSION_REQUEST_CODE
+        )
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == MIC_PERMISSION_REQUEST_CODE) {
+            val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            val message = if (granted) {
+                "Mikrofon diizinkan. Silakan coba tombol 🎤 di keyboard."
+            } else {
+                "Izin mikrofon ditolak. Fitur bicara-jadi-teks tidak akan berfungsi."
+            }
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun buildUi() {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -30,7 +82,9 @@ class SetupActivity : Activity() {
         }
 
         val desc = TextView(this).apply {
-            text = "1) Aktifkan keyboard ini di Pengaturan.\n2) Pilih Big Keyboard sebagai keyboard aktif."
+            text = "1) Aktifkan keyboard ini di Pengaturan.\n" +
+                "2) Pilih Big Keyboard sebagai keyboard aktif.\n" +
+                "3) Izinkan mikrofon untuk pakai fitur bicara-jadi-teks (tombol 🎤)."
             textSize = 16f
             gravity = Gravity.CENTER
             setPadding(0, 32, 0, 32)
@@ -51,10 +105,16 @@ class SetupActivity : Activity() {
             }
         }
 
+        val micButton = Button(this).apply {
+            text = "3. Izinkan Mikrofon"
+            setOnClickListener { requestMicPermission() }
+        }
+
         layout.addView(title)
         layout.addView(desc)
         layout.addView(enableButton)
         layout.addView(chooseButton)
+        layout.addView(micButton)
 
         // Kalau ada catatan error dari crash sebelumnya, tampilkan di sini
         // supaya bisa di-screenshot tanpa perlu logcat/tools tambahan.
