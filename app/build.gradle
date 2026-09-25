@@ -8,11 +8,11 @@ android {
     compileSdk 34
 
     defaultConfig {
-        applicationId "id.bram.bigkeyboard"
+        applicationId "id.bram.bigkeyboard.v2"
         minSdk 23
         targetSdk 34
         versionCode 1
-        versionName "1.0"
+        versionName "1.0-v2"
     }
 
     buildTypes {
