@@ -48,7 +48,7 @@ tombol **ABC** di halaman itu kembali ke huruf.
 
 ## Perilaku Khusus
 
-- **DEL**: sekali pencet = hapus 1 huruf. Tahan ±3 detik = hapus semua teks di kolom.
+- **DEL**: sekali pencet = hapus 1 huruf. Tahan ±1,5 detik = hapus semua teks di kolom.
 - **Kapital otomatis**: huruf pertama saat mulai ketik, dan huruf pertama setelah
   tanda titik (`.`), otomatis besar. Huruf berikutnya kembali kecil.
 - **Shift (⇧)**: sekali pencet = kapital untuk 1 huruf berikutnya saja.

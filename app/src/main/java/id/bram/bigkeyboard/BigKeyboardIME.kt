@@ -57,7 +57,7 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
         private const val KEYCODE_SWITCH_IME = -2
         private const val KEYCODE_MIC = -20
         private const val DOUBLE_TAP_MS = 350L
-        private const val LONG_PRESS_DELETE_MS = 3000L
+        private const val LONG_PRESS_DELETE_MS = 1500L
         private const val MIC_LABEL_IDLE = "🎤"      // 🎤
         private const val MIC_LABEL_LISTENING = "⏹"        // ⏹
     }
