@@ -25,7 +25,23 @@ jobs:
         with:
           gradle-version: 8.9
 
+      - name: Prepare signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/bram.jks"
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/bram.jks" >> "$GITHUB_ENV"
+            echo "Signing with fixed key"
+          else
+            echo "No KEYSTORE_BASE64 secret, using random debug key"
+          fi
+
       - name: Build debug APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: gradle assembleDebug
 
       - name: Upload APK
