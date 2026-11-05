@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: [ main, master, dev ]
+    branches: [ main, master, dev, v3 ]
   workflow_dispatch:
 
 permissions:
@@ -47,18 +47,18 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: BramKeyboardV2-debug-apk
+          name: BramKeyboardV3-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Publish APK to Releases (dev branch only)
-        if: github.ref == 'refs/heads/dev'
+      - name: Publish APK to Releases (v3 branch only)
+        if: github.ref == 'refs/heads/v3'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk BramKeyboardV2.apk
-          gh release delete dev-latest --cleanup-tag --yes || true
-          gh release create dev-latest BramKeyboardV2.apk \
+          cp app/build/outputs/apk/debug/app-debug.apk BramKeyboardV3.apk
+          gh release delete v3-latest --cleanup-tag --yes || true
+          gh release create v3-latest BramKeyboardV3.apk \
             --target "$GITHUB_SHA" \
             --prerelease \
-            --title "Bram Keyboard V2 (build ${{ github.run_number }})" \
+            --title "Bram Keyboard V3 (build ${{ github.run_number }})" \
             --notes "Auto-build dari commit ${GITHUB_SHA::7}"
