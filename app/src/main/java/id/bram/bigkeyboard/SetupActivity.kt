@@ -116,14 +116,6 @@ class SetupActivity : Activity() {
         layout.addView(chooseButton)
         layout.addView(micButton)
 
-        val teksKerenButton = Button(this).apply {
-            text = "✨ Atur Teks Keren"
-            setOnClickListener {
-                startActivity(Intent(this@SetupActivity, TextKerenActivity::class.java))
-            }
-        }
-        layout.addView(teksKerenButton)
-
         // Kalau ada catatan error dari crash sebelumnya, tampilkan di sini
         // supaya bisa di-screenshot tanpa perlu logcat/tools tambahan.
         val crashFile = File(filesDir, "last_crash.txt")
