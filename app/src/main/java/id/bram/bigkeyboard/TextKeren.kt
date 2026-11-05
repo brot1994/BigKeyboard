@@ -25,10 +25,23 @@ object TextKerenStore {
         TeksKeren("sayang", "♥•.¸¸.•♥ ѕαуαηg ♥•.¸¸.•♥")
     )
 
+    private const val KEY_TEMPLATE_VER = "template_ver"
+    private const val TEMPLATE_VER = 1
+
+    /** Tambahkan template yang belum ada (dibandingkan dari teksnya), tanpa singkatan. */
+    fun tambahTemplate(list: MutableList<TeksKeren>): Int {
+        val ada = list.map { it.teks }.toHashSet()
+        var n = 0
+        TemplateKeren.semua.forEach {
+            if (ada.add(it)) { list.add(TeksKeren("", it)); n++ }
+        }
+        return n
+    }
+
     fun load(context: Context): MutableList<TeksKeren> {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val raw = prefs.getString(KEY, null) ?: return defaults.toMutableList()
-        return try {
+        val raw = prefs.getString(KEY, null)
+        val list = if (raw == null) defaults.toMutableList() else try {
             val arr = JSONArray(raw)
             MutableList(arr.length()) { i ->
                 val o = arr.getJSONObject(i)
@@ -37,6 +50,13 @@ object TextKerenStore {
         } catch (e: Exception) {
             defaults.toMutableList()
         }
+        // Sekali saja: masukkan kumpulan template (juga untuk yang sudah pernah menyimpan).
+        if (prefs.getInt(KEY_TEMPLATE_VER, 0) < TEMPLATE_VER) {
+            tambahTemplate(list)
+            save(context, list)
+            prefs.edit().putInt(KEY_TEMPLATE_VER, TEMPLATE_VER).apply()
+        }
+        return list
     }
 
     fun save(context: Context, list: List<TeksKeren>) {

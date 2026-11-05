@@ -26,13 +26,15 @@ class TextKerenActivity : Activity() {
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
+    private var aktifSaja = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         entries = TextKerenStore.load(this)
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(16))
+            setPadding(dp(12), dp(16), dp(12), dp(16))
             setBackgroundColor(0xFF121212.toInt())
         }
 
@@ -42,23 +44,56 @@ class TextKerenActivity : Activity() {
             setTextColor(Color.WHITE)
         })
         root.addView(TextView(this).apply {
-            text = "Ketik singkatan di keyboard, lalu ketuk sarannya di bar atas keyboard " +
-                "untuk mengganti dengan teks keren. Ketuk entri di bawah untuk mengubah."
+            text = "Kiri: teks keren. Kanan: isi singkatan untuk memanggilnya dari keyboard " +
+                "(contoh: maacih). Yang singkatannya kosong tidak dipakai. " +
+                "Ketuk teks kiri untuk mengubah, − untuk menghapus."
             textSize = 14f
             setTextColor(0xFFBBBBBB.toInt())
-            setPadding(0, dp(6), 0, dp(12))
-        })
-        root.addView(Button(this).apply {
-            text = "+ Tambah Teks Keren"
-            textSize = 18f
-            setOnClickListener { showEditor(-1) }
+            setPadding(dp(4), dp(6), dp(4), dp(12))
         })
 
-        listContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(12), 0, 0)
+        val tombolAtas = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        tombolAtas.addView(Button(this).apply {
+            text = "+ Tambah"
+            textSize = 17f
+            setOnClickListener { showEditor(-1) }
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        tombolAtas.addView(Button(this).apply {
+            fun label() { text = if (aktifSaja) "Tampilkan: aktif" else "Tampilkan: semua" }
+            label()
+            textSize = 15f
+            setOnClickListener { aktifSaja = !aktifSaja; label(); renderList() }
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        root.addView(tombolAtas)
+
+        // Judul kolom
+        val judul = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(12), dp(12), dp(4), dp(4))
         }
+        judul.addView(TextView(this).apply {
+            text = "TEKS KEREN"; textSize = 12f; setTextColor(0xFF888888.toInt())
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        judul.addView(TextView(this).apply {
+            text = "SINGKATAN"; textSize = 12f; setTextColor(0xFF888888.toInt())
+        }, LinearLayout.LayoutParams(dp(150), ViewGroup.LayoutParams.WRAP_CONTENT))
+        root.addView(judul)
+
+        listContainer = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         root.addView(listContainer)
+
+        root.addView(Button(this).apply {
+            text = "Pulihkan template bawaan yang terhapus"
+            textSize = 14f
+            setOnClickListener {
+                val n = TextKerenStore.tambahTemplate(entries)
+                TextKerenStore.save(this@TextKerenActivity, entries)
+                renderList()
+                toast(if (n == 0) "Semua template masih ada" else "$n template dipulihkan")
+            }
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(16) })
 
         val scroll = ScrollView(this).apply { setBackgroundColor(0xFF121212.toInt()) }
         scroll.addView(root)
@@ -68,36 +103,82 @@ class TextKerenActivity : Activity() {
 
     private fun renderList() {
         listContainer.removeAllViews()
-        if (entries.isEmpty()) {
+        val tampil = entries.withIndex().filter { !aktifSaja || it.value.singkatan.isNotEmpty() }
+        if (tampil.isEmpty()) {
             listContainer.addView(TextView(this).apply {
-                text = "Belum ada teks keren."
+                text = if (aktifSaja) "Belum ada yang diberi singkatan." else "Belum ada teks keren."
                 setTextColor(0xFF888888.toInt())
+                setPadding(dp(12), dp(12), 0, 0)
             })
         }
-        entries.forEachIndexed { i, e ->
-            val card = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(14), dp(10), dp(14), dp(10))
+        tampil.forEach { (i, e) ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(dp(12), dp(8), dp(4), dp(8))
                 background = GradientDrawable().apply {
                     cornerRadius = dp(10).toFloat()
                     setColor(0xFF2A2A2A.toInt())
                 }
                 layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = dp(8) }
-                setOnClickListener { showEditor(i) }
+                ).apply { bottomMargin = dp(6) }
             }
-            card.addView(TextView(this).apply {
-                text = e.singkatan
-                textSize = 18f
-                setTextColor(0xFFFFC94D.toInt())
-            })
-            card.addView(TextView(this).apply {
+
+            // Kiri: teks keren (ketuk untuk ubah)
+            row.addView(TextView(this).apply {
                 text = e.teks
                 textSize = 16f
                 setTextColor(Color.WHITE)
+                setPadding(0, 0, dp(8), 0)
+                setOnClickListener { showEditor(i) }
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+
+            // Kanan: singkatan (langsung tersimpan saat diketik)
+            val input = EditText(this).apply {
+                setText(e.singkatan)
+                hint = "singkatan"
+                setSingleLine()
+                textSize = 16f
+                setTextColor(0xFFFFC94D.toInt())
+                setHintTextColor(0xFF666666.toInt())
+                inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                    android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            }
+            input.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(s: Editable?) {
+                    val k = s.toString().trim().lowercase()
+                    when {
+                        k.contains(' ') -> input.error = "Tanpa spasi"
+                        k.isNotEmpty() && entries.withIndex()
+                            .any { it.index != i && it.value.singkatan == k } ->
+                            input.error = "Sudah dipakai"
+                        else -> {
+                            input.error = null
+                            entries[i] = entries[i].copy(singkatan = k)
+                            TextKerenStore.save(this@TextKerenActivity, entries)
+                        }
+                    }
+                }
             })
-            listContainer.addView(card)
+            row.addView(input, LinearLayout.LayoutParams(dp(110), ViewGroup.LayoutParams.WRAP_CONTENT))
+
+            // Tombol hapus
+            row.addView(TextView(this).apply {
+                text = "−"
+                textSize = 26f
+                setTextColor(0xFFFF6B6B.toInt())
+                gravity = android.view.Gravity.CENTER
+                setOnClickListener {
+                    entries.removeAt(i)
+                    TextKerenStore.save(this@TextKerenActivity, entries)
+                    renderList()
+                }
+            }, LinearLayout.LayoutParams(dp(40), dp(44)))
+
+            listContainer.addView(row)
         }
     }
 
@@ -113,7 +194,7 @@ class TextKerenActivity : Activity() {
         }
 
         val inKey = EditText(this).apply {
-            hint = "contoh: maacih"
+            hint = "contoh: maacih (boleh kosong)"
             setSingleLine()
             setText(existing?.singkatan ?: "")
         }
@@ -200,10 +281,10 @@ class TextKerenActivity : Activity() {
                 val k = inKey.text.toString().trim().lowercase()
                 val t = inText.text.toString()
                 when {
-                    k.isEmpty() || k.contains(' ') ->
+                    k.contains(' ') ->
                         toast("Singkatan harus satu kata, tanpa spasi")
                     t.isBlank() -> toast("Teks keren masih kosong")
-                    entries.withIndex().any { it.index != index && it.value.singkatan == k } ->
+                    k.isNotEmpty() && entries.withIndex().any { it.index != index && it.value.singkatan == k } ->
                         toast("Singkatan \"$k\" sudah dipakai")
                     else -> {
                         val item = TeksKeren(k, t)

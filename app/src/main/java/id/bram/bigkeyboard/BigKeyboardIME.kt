@@ -235,7 +235,7 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
         if (key.length < 2) return
 
         val matches = teksKeren
-            .filter { it.singkatan.startsWith(key) }
+            .filter { it.singkatan.isNotEmpty() && it.singkatan.startsWith(key) }
             .sortedWith(compareBy({ it.singkatan != key }, { it.singkatan.length }))
             .take(8)
         matches.forEach { item ->
