@@ -11,11 +11,17 @@ import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.graphics.drawable.GradientDrawable
+import android.text.TextUtils
 import android.util.Log
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
+import android.widget.HorizontalScrollView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -62,6 +68,15 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
         private const val MIC_LABEL_LISTENING = "⏹"        // ⏹
     }
 
+    // --- Teks Keren (bar saran) ---
+    private var suggestionRow: LinearLayout? = null
+    private var teksKeren: List<TeksKeren> = emptyList()
+    private var lastSuggestKey = "\u0000"
+    // Penggantian terakhir, supaya bisa dibatalkan: (teks yang disisipkan, kata asli)
+    private var lastReplacement: Pair<String, String>? = null
+
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+
     override fun onCreateInputView(): View {
         return try {
             keyboardView = layoutInflater.inflate(R.layout.keyboard_view, null) as KeyboardView
@@ -70,7 +85,13 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
             altKeyboard = Keyboard(this, R.xml.keyboard_alt)
             keyboardView.keyboard = lettersKeyboard
             keyboardView.setOnKeyboardActionListener(this)
-            keyboardView
+
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(0xFF0d0d0d.toInt())
+                addView(buildSuggestionBar())
+                addView(keyboardView)
+            }
         } catch (e: Throwable) {
             // Kalau ada error, tampilkan pesannya di layar (bukan diam/blank)
             // supaya gampang di-screenshot dan dilacak penyebabnya.
@@ -92,6 +113,11 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
         autoCapNext = true // huruf pertama saat mulai ketik = kapital
         keyboardView.keyboard = lettersKeyboard
         updateShiftVisual()
+        // Muat ulang kamus (mungkin baru diubah di halaman pengaturan).
+        teksKeren = TextKerenStore.load(this)
+        lastReplacement = null
+        lastSuggestKey = "\u0000"
+        updateSuggestions()
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -119,6 +145,144 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
         // dari kemungkinan panjang teks; InputConnection akan berhenti di batas teks yang ada.
         ic.deleteSurroundingText(9999, 9999)
         ic.endBatchEdit()
+    }
+
+    // --- Teks Keren: bar saran di atas keyboard ---
+
+    private fun buildSuggestionBar(): View {
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(0xFF161616.toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48)
+            )
+        }
+        // Tombol ✨ di kiri: buka halaman pengaturan Teks Keren.
+        val settings = TextView(this).apply {
+            text = "✨"
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setPadding(dp(14), 0, dp(14), 0)
+            setOnClickListener {
+                startActivity(Intent(this@BigKeyboardIME, TextKerenActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        }
+        bar.addView(settings, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT))
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        suggestionRow = row
+        val scroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(row)
+        }
+        bar.addView(scroll, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+        return bar
+    }
+
+    private fun makeChip(label: String, highlight: Boolean, onTap: () -> Unit): TextView =
+        TextView(this).apply {
+            text = label
+            textSize = 16f
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            maxWidth = dp(260)
+            setTextColor(if (highlight) 0xFF111111.toInt() else 0xFFFFFFFF.toInt())
+            setPadding(dp(14), dp(6), dp(14), dp(6))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(18).toFloat()
+                setColor(if (highlight) 0xFFFFC94D.toInt() else 0xFF333333.toInt())
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp(8) }
+            setOnClickListener { onTap() }
+        }
+
+    /** Kata yang sedang diketik (huruf/angka tepat sebelum kursor). */
+    private fun currentWord(): String {
+        val before = currentInputConnection?.getTextBeforeCursor(40, 0)?.toString() ?: return ""
+        var i = before.length
+        while (i > 0 && before[i - 1].isLetterOrDigit()) i--
+        return before.substring(i)
+    }
+
+    private fun updateSuggestions() {
+        val row = suggestionRow ?: return
+        val word = currentWord()
+        val key = word.lowercase()
+
+        // Tombol batal: tampil selama teks keren yang baru disisipkan masih tepat sebelum kursor.
+        val undo = lastReplacement?.takeIf { (inserted, _) ->
+            currentInputConnection?.getTextBeforeCursor(inserted.length, 0)?.toString() == inserted
+        }
+        if (undo == null) lastReplacement = null
+
+        val stateKey = key + "|" + (undo != null)
+        if (stateKey == lastSuggestKey) return
+        lastSuggestKey = stateKey
+        row.removeAllViews()
+
+        if (undo != null) {
+            row.addView(makeChip("↩ batal (${undo.second})", false) { undoReplacement() })
+            return
+        }
+        if (key.length < 2) return
+
+        val matches = teksKeren
+            .filter { it.singkatan.startsWith(key) }
+            .sortedWith(compareBy({ it.singkatan != key }, { it.singkatan.length }))
+            .take(8)
+        matches.forEach { item ->
+            row.addView(makeChip(item.teks, item.singkatan == key) { applyTeksKeren(word, item.teks) })
+        }
+    }
+
+    private fun applyTeksKeren(word: String, teks: String) {
+        val ic = currentInputConnection ?: return
+        // Pastikan kata yang diketik masih ada tepat sebelum kursor.
+        if (currentWord() != word) { updateSuggestions(); return }
+        val inserted = "$teks "
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(word.length, 0)
+        ic.commitText(inserted, 1)
+        ic.endBatchEdit()
+        lastReplacement = inserted to word
+        autoCapNext = false
+        updateShiftVisual()
+        lastSuggestKey = "\u0000"
+        updateSuggestions()
+    }
+
+    /** Kembalikan teks keren terakhir ke kata aslinya. Return true kalau berhasil. */
+    private fun undoReplacement(): Boolean {
+        val (inserted, original) = lastReplacement ?: return false
+        val ic = currentInputConnection ?: return false
+        if (ic.getTextBeforeCursor(inserted.length, 0)?.toString() != inserted) {
+            lastReplacement = null
+            return false
+        }
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(inserted.length, 0)
+        ic.commitText(original, 1)
+        ic.endBatchEdit()
+        lastReplacement = null
+        lastSuggestKey = "\u0000"
+        updateSuggestions()
+        return true
+    }
+
+    override fun onUpdateSelection(
+        oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int,
+        candidatesStart: Int, candidatesEnd: Int
+    ) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        updateSuggestions()
     }
 
     // --- Voice typing (mic) ---
@@ -231,6 +395,8 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
 
     override fun onKey(primaryCode: Int, keyCodes: IntArray?) {
         val ic: InputConnection = currentInputConnection ?: return
+        // Tombol apa pun selain DEL membatalkan kesempatan "batal" teks keren.
+        if (primaryCode != Keyboard.KEYCODE_DELETE) lastReplacement = null
 
         when (primaryCode) {
             Keyboard.KEYCODE_DELETE -> {
@@ -238,6 +404,8 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
                 // jangan proses hapus satu-huruf lagi di sini.
                 if (isDeleteLongPress) {
                     isDeleteLongPress = false
+                } else if (undoReplacement()) {
+                    // Backspace tepat setelah memilih teks keren -> kembali ke kata asli.
                 } else {
                     val selected = ic.getSelectedText(0)
                     if (selected.isNullOrEmpty()) {
