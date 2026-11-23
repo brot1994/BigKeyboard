@@ -70,6 +70,7 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
 
     // --- Teks Keren (bar saran) ---
     private var suggestionRow: LinearLayout? = null
+    private var suggestionScroll: HorizontalScrollView? = null
     private var teksKeren: List<TeksKeren> = emptyList()
     private var lastSuggestKey = "\u0000"
     // Penggantian terakhir, supaya bisa dibatalkan: (teks yang disisipkan, kata asli)
@@ -181,6 +182,7 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
             isHorizontalScrollBarEnabled = false
             addView(row)
         }
+        suggestionScroll = scroll
         bar.addView(scroll, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
         return bar
     }
@@ -223,23 +225,84 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
         }
         if (undo == null) lastReplacement = null
 
-        val stateKey = key + "|" + (undo != null)
-        if (stateKey == lastSuggestKey) return
-        lastSuggestKey = stateKey
-        row.removeAllViews()
-
         if (undo != null) {
-            row.addView(makeChip("↩ batal (${undo.second})", false) { undoReplacement() })
+            val stateKey = "undo|" + undo.first
+            if (stateKey != lastSuggestKey) {
+                lastSuggestKey = stateKey
+                row.removeAllViews()
+                row.addView(makeChip("↩ batal (${undo.second})", false) { undoReplacement() })
+            }
             return
         }
-        if (key.length < 2) return
 
-        val matches = teksKeren
+        val matches = if (key.length < 2) emptyList() else teksKeren
             .filter { it.singkatan.isNotEmpty() && it.singkatan.startsWith(key) }
             .sortedWith(compareBy({ it.singkatan != key }, { it.singkatan.length }))
             .take(8)
-        matches.forEach { item ->
-            row.addView(makeChip(item.teks, item.singkatan == key) { applyTeksKeren(word, item.teks) })
+
+        if (matches.isNotEmpty()) {
+            suggestionScroll?.scrollTo(0, 0)
+            val stateKey = "match|$key"
+            if (stateKey == lastSuggestKey) return
+            lastSuggestKey = stateKey
+            row.removeAllViews()
+            matches.forEach { item ->
+                row.addView(makeChip(item.teks, item.singkatan == key) { applyTeksKeren(word, item.teks) })
+            }
+            return
+        }
+
+        // Tidak ada saran -> tampilkan teks yang sedang diketik, supaya tetap terlihat
+        // walaupun kolom isian di aplikasi tertutup keyboard (mis. Tokopedia).
+        if (lastSuggestKey != "preview") {
+            lastSuggestKey = "preview"
+            row.removeAllViews()
+            row.addView(previewView)
+        }
+        previewView.text = previewText()
+        // Kursor biasanya di akhir -> geser bar ke kanan supaya ketikan terbaru terlihat.
+        suggestionScroll?.post { suggestionScroll?.fullScroll(View.FOCUS_RIGHT) }
+    }
+
+    private val previewView: TextView by lazy {
+        TextView(this).apply {
+            textSize = 17f
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.START
+            setTextColor(0xFFDDDDDD.toInt())
+            setPadding(dp(4), 0, dp(12), 0)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+    }
+
+    private fun isPasswordField(): Boolean {
+        val t = currentInputEditorInfo?.inputType ?: return false
+        val v = t and android.text.InputType.TYPE_MASK_VARIATION
+        val c = t and android.text.InputType.TYPE_MASK_CLASS
+        return (c == android.text.InputType.TYPE_CLASS_TEXT &&
+            (v == android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+             v == android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
+             v == android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)) ||
+            (c == android.text.InputType.TYPE_CLASS_NUMBER &&
+             v == android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD)
+    }
+
+    /** Potongan teks di sekitar kursor, ditampilkan di bar atas keyboard. */
+    private fun previewText(): CharSequence {
+        if (isPasswordField()) return "•••••"
+        val ic = currentInputConnection ?: return ""
+        val before = ic.getTextBeforeCursor(80, 0)?.toString().orEmpty().replace('\n', ' ')
+        val after = ic.getTextAfterCursor(30, 0)?.toString().orEmpty().replace('\n', ' ')
+        if (before.isEmpty() && after.isEmpty()) return ""
+        return android.text.SpannableStringBuilder().apply {
+            append(before)
+            val c = length
+            append("|")
+            setSpan(android.text.style.ForegroundColorSpan(0xFFFFC94D.toInt()),
+                c, c + 1, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            append(after)
         }
     }
 
