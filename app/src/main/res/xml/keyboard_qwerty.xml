@@ -42,7 +42,7 @@
         <Key android:codes="-5" android:keyLabel="DEL" />
     </Row>
     <Row>
-        <Key android:codes="-6" android:keyLabel="?123" android:keyWidth="12%p" />
+        <Key android:codes="-6" android:keyLabel="\?123" android:keyWidth="12%p" />
         <Key android:codes="-20" android:keyLabel="🎤" android:keyWidth="10%p" />
         <Key android:codes="32" android:keyLabel="&#160;" android:keyWidth="46%p" android:isRepeatable="true" />
         <Key android:codes="46" android:keyLabel="." android:keyWidth="10%p" />
