@@ -124,6 +124,41 @@ class SetupActivity : Activity() {
         }
         layout.addView(teksKerenButton)
 
+        val pilihan = listOf(
+            LayoutPilihan.AUTO to "Otomatis (5 kolom di HP, 6 kolom di layar pendek, QWERTY di layar lebar)",
+            Susunan.LIMA.name to "Selalu 5 kolom",
+            Susunan.ENAM.name to "Selalu 6 kolom",
+            Susunan.QWERTY.name to "Selalu QWERTY"
+        )
+        fun labelLayout(): String {
+            val m = LayoutPilihan.mode(this)
+            val nama = if (m == LayoutPilihan.AUTO) "Otomatis"
+                else runCatching { Susunan.valueOf(m).label }.getOrDefault("5 kolom")
+            return "⌨ Layout keyboard: $nama"
+        }
+        val layoutButton = Button(this)
+        layoutButton.text = labelLayout()
+        layoutButton.setOnClickListener {
+            val now = pilihan.indexOfFirst { it.first == LayoutPilihan.mode(this) }.coerceAtLeast(0)
+            android.app.AlertDialog.Builder(this)
+                .setTitle("Layout keyboard")
+                .setSingleChoiceItems(pilihan.map { it.second }.toTypedArray(), now) { d, i ->
+                    LayoutPilihan.setMode(this, pilihan[i].first)
+                    layoutButton.text = labelLayout()
+                    d.dismiss()
+                }
+                .setNegativeButton("Batal", null)
+                .show()
+        }
+        layout.addView(layoutButton)
+        layout.addView(TextView(this).apply {
+            text = "Ganti cepat saat mengetik: ketuk tombol 5▦ / 6▦ / QW di bar ✨. " +
+                "Pilihan itu diingat terpisah untuk HP biasa, layar pendek, dan layar lebar."
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setPadding(0, 8, 0, 0)
+        })
+
         // Kalau ada catatan error dari crash sebelumnya, tampilkan di sini
         // supaya bisa di-screenshot tanpa perlu logcat/tools tambahan.
         val crashFile = File(filesDir, "last_crash.txt")

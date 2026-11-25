@@ -78,10 +78,51 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
+    // --- Susunan tombol (5 kolom / 6 kolom / QWERTY) & ciutkan ---
+    private var susunan = Susunan.LIMA
+    private val keyboardCache = HashMap<Susunan, Keyboard>()
+    private var layoutChip: TextView? = null
+    private var collapseChip: TextView? = null
+    private var isCollapsed = false
+
+    private fun keyboardUntuk(s: Susunan): Keyboard =
+        keyboardCache.getOrPut(s) { Keyboard(this, s.xml) }
+
+    /** Pasang susunan huruf sesuai pilihan untuk layar saat ini. */
+    private fun terapkanSusunan(s: Susunan) {
+        susunan = s
+        lettersKeyboard = keyboardUntuk(s)
+        if (::keyboardView.isInitialized && currentPage == PageMode.LETTERS) {
+            keyboardView.keyboard = lettersKeyboard
+            updateShiftVisual()
+        }
+        if (::keyboardView.isInitialized) {
+            setMicKeyLabel(if (isListening) MIC_LABEL_LISTENING else MIC_LABEL_IDLE)
+        }
+        layoutChip?.text = s.chip
+    }
+
+    private fun gantiSusunan() {
+        val baru = susunan.berikutnya()
+        LayoutPilihan.ingat(this, resources.configuration, baru)
+        currentPage = PageMode.LETTERS
+        terapkanSusunan(baru)
+        Toast.makeText(this, "Layout: " + baru.label, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun setCollapsed(c: Boolean) {
+        isCollapsed = c
+        if (::keyboardView.isInitialized) keyboardView.visibility = if (c) View.GONE else View.VISIBLE
+        collapseChip?.text = if (c) "▲" else "▼"
+    }
+
     override fun onCreateInputView(): View {
         return try {
             keyboardView = layoutInflater.inflate(R.layout.keyboard_view, null) as KeyboardView
-            lettersKeyboard = Keyboard(this, R.xml.keyboard_layout)
+            // Ukuran layar bisa berubah (Fold dilipat/dibuka) -> buat ulang susunan.
+            keyboardCache.clear()
+            susunan = LayoutPilihan.aktif(this, resources.configuration)
+            lettersKeyboard = keyboardUntuk(susunan)
             symbolsKeyboard = Keyboard(this, R.xml.keyboard_symbols)
             altKeyboard = Keyboard(this, R.xml.keyboard_alt)
             keyboardView.keyboard = lettersKeyboard
@@ -112,6 +153,8 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
         isShifted = false
         isCapsLocked = false
         autoCapNext = true // huruf pertama saat mulai ketik = kapital
+        terapkanSusunan(LayoutPilihan.aktif(this, resources.configuration))
+        setCollapsed(false)
         keyboardView.keyboard = lettersKeyboard
         updateShiftVisual()
         // Muat ulang kamus (mungkin baru diubah di halaman pengaturan).
@@ -184,6 +227,36 @@ class BigKeyboardIME : InputMethodService(), KeyboardView.OnKeyboardActionListen
         }
         suggestionScroll = scroll
         bar.addView(scroll, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+
+        // Tombol ganti susunan: 5▦ -> 6▦ -> QW -> 5▦
+        val chip = TextView(this).apply {
+            text = susunan.chip
+            textSize = 15f
+            gravity = Gravity.CENTER
+            setTextColor(0xFFFFC94D.toInt())
+            setPadding(dp(10), 0, dp(10), 0)
+            background = GradientDrawable().apply {
+                cornerRadius = dp(8).toFloat()
+                setStroke(dp(1), 0xFF555555.toInt())
+            }
+            setOnClickListener { gantiSusunan() }
+        }
+        layoutChip = chip
+        bar.addView(chip, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, dp(34)).apply { marginStart = dp(6) })
+
+        // Tombol ciutkan / munculkan keyboard
+        val collapse = TextView(this).apply {
+            text = "▼"
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setTextColor(0xFFFFC94D.toInt())
+            setPadding(dp(14), 0, dp(14), 0)
+            setOnClickListener { setCollapsed(!isCollapsed) }
+        }
+        collapseChip = collapse
+        bar.addView(collapse, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT))
         return bar
     }
 
